@@ -1,3 +1,5 @@
+If it looks bad it's because c0pilot wrote it 🫣
+
 # React Native Fast Confetti Test App
 
 A comprehensive test application for the [react-native-fast-confetti](https://github.com/AlirezaHadjar/react-native-fast-confetti) library, showcasing all confetti types and configurations.
