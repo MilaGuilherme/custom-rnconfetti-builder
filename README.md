@@ -1,21 +1,68 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# React Native Fast Confetti Test App
 
-# Getting Started
+A comprehensive test application for the [react-native-fast-confetti](https://github.com/AlirezaHadjar/react-native-fast-confetti) library, showcasing all confetti types and configurations.
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+## 🎊 Features
 
-## Step 1: Start Metro
+This app demonstrates four different confetti effects:
+
+- **Basic Confetti**: Simple falling confetti animation
+- **PI Confetti**: Burst effect that explodes outward then falls gracefully  
+- **Continuous Confetti**: Non-stop falling confetti effect
+- **Cannon Confetti**: Confetti shot from multiple cannons positioned at screen corners
+
+## 📦 Dependencies
+
+The app includes all necessary dependencies:
+
+- `react-native-fast-confetti` - The main confetti library
+- `react-native-reanimated` - For smooth animations
+- `@shopify/react-native-skia` - For hardware-accelerated graphics
+- `react-native-safe-area-context` - For safe area handling
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- Node.js >= 20.19.4 (Note: Current Node.js v20.1.0 has compatibility issues)
+- React Native development environment (Android Studio / Xcode)
+- iOS Simulator or Android Emulator
+
+### Installation
+
+1. **Install dependencies:**
+   ```bash
+   npm install
+   ```
+
+2. **iOS Setup (macOS only):**
+   ```bash
+   cd ios
+   bundle install
+   bundle exec pod install
+   cd ..
+   ```
+
+### Running the App
+
+#### Start Metro Bundler
 
 First, you will need to run **Metro**, the JavaScript build tool for React Native.
 
 To start the Metro dev server, run the following command from the root of your React Native project:
 
-```sh
-# Using npm
+```bash
 npm start
+```
 
-# OR using Yarn
-yarn start
+#### Run on iOS
+```bash
+npm run ios
+```
+
+#### Run on Android  
+```bash
+npm run android
 ```
 
 ## Step 2: Build and run your app
