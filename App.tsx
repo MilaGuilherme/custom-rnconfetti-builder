@@ -38,12 +38,23 @@ import { useSVG, type SkSVG } from '@shopify/react-native-skia';
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 // SVG assets optimized for confetti textures
-// Note: Excluding geometric shapes (Squares, Rectangles) that don't work well when stretched
 const svgAssets = [
-  require('./svg/Petals.svg'),      // Natural petal shapes - works great
-  require('./svg/Sqiggles.svg'),   // Squiggly lines - works great  
-  require('./svg/Stars.svg'),      // Star shapes - works well
-  require('./svg/GreenDonuts.svg'), // Donut shapes - works well
+  require('./images/svg/Petals.svg'),      
+  require('./images/svg/Sqiggles.svg'),   
+  require('./images/svg/Stars.svg'),     
+  require('./images/svg/GreenDonuts.svg'), 
+  require('./images/svg/Rectangles.svg'),
+  require('./images/svg/Squares.svg'),
+] as const;
+
+// PNG assets for confetti textures (fallback/alternative)
+const pngAssets = [
+  require('./images/png/Petals.png'),
+  require('./images/png/Sqiggles.png'),
+  require('./images/png/Stars.png'),
+  require('./images/png/GreenDonuts.png'),
+  require('./images/png/Rectangles.png'),
+  require('./images/png/Squares.png'),
 ] as const;
 
 // Configuration interfaces for each confetti type
@@ -621,22 +632,43 @@ const useLoadSVGs = () => {
     useSVG(svgAssets[1]), // Squiggles  
     useSVG(svgAssets[2]), // Stars
     useSVG(svgAssets[3]), // GreenDonuts
+    useSVG(svgAssets[4]), // Rectangles
+    useSVG(svgAssets[5]), // Squares
   ];
 
   const loadedSvgs = useMemo(
-    () => svgs.filter(Boolean) as SkSVG[],
+    () => {
+      const filtered = svgs.filter(Boolean) as SkSVG[];
+      console.log(`SVG Loading: ${filtered.length}/${svgAssets.length} SVGs loaded`);
+      return filtered;
+    },
     svgs
   );
 
   const [allLoaded, setAllLoaded] = useState<SkSVG[] | null>(null);
 
   useEffect(() => {
+    console.log(`SVG Status: ${loadedSvgs.length} loaded, target: ${svgAssets.length}`);
     if (!allLoaded && loadedSvgs.length === svgAssets.length) {
+      console.log('🎨 All SVGs loaded successfully!');
       setAllLoaded(loadedSvgs);
     }
   }, [allLoaded, loadedSvgs]);
 
   return allLoaded;
+};
+
+// Custom hook to load PNG assets (alternative to SVGs)
+const useLoadPNGs = () => {
+  const [pngsLoaded, setPngsLoaded] = useState(false);
+  
+  useEffect(() => {
+    // PNGs are loaded via require(), so they're available immediately
+    console.log('📷 PNG assets loaded successfully!');
+    setPngsLoaded(true);
+  }, []);
+  
+  return pngsLoaded ? pngAssets : null;
 };
 
 function App() {
@@ -660,29 +692,43 @@ function ConfettiTestApp() {
   const [isRunning, setIsRunning] = useState(false);
   const [customConfig, setCustomConfig] = useState<CustomConfettiConfig>(defaultConfig);
   const [configKey, setConfigKey] = useState(0); // Force re-mount when config changes significantly
+  const [useTextures, setUseTextures] = useState<'svg' | 'png' | 'none'>('svg');
   
   const loadedSvgs = useLoadSVGs();
+  const loadedPngs = useLoadPNGs();
 
   const handleAnimationStart = useCallback((type: string) => {
-    console.log(`${type} confetti animation started`);
+    console.log(`🎊 ${type} confetti animation started`);
     setIsRunning(true);
   }, []);
 
   const handleAnimationEnd = useCallback((type: string) => {
-    console.log(`${type} confetti animation ended`);
+    console.log(`🎊 ${type} confetti animation ended`);
     // Simply stop running when any animation ends
     setIsRunning(false);
   }, []);
 
   const handleConfettiAction = (action: 'start' | 'pause' | 'reset') => {
+    console.log(`🎮 Confetti Action: ${action}`);
+    console.log(`📊 Available refs: ${confettiRefs.current.filter(Boolean).length}`);
+    
     try {
       // Apply action to all current confetti refs
-      confettiRefs.current.forEach((ref) => {
-        if (!ref) return;
+      let actionCount = 0;
+      confettiRefs.current.forEach((ref, index) => {
+        if (!ref) {
+          console.log(`⚠️ Ref ${index} is null`);
+          return;
+        }
+        
+        console.log(`🎯 Executing ${action} on ref ${index}`);
         if (action === 'start') ref.restart?.();
         if (action === 'pause') ref.pause?.();
         if (action === 'reset') ref.reset?.();
+        actionCount++;
       });
+      
+      console.log(`✅ ${action} applied to ${actionCount} confetti instances`);
       
       if (action === 'start' && !isRunning) {
         setIsRunning(true);
@@ -696,6 +742,7 @@ function ConfettiTestApp() {
       }
 
     } catch (error) {
+      console.error(`❌ Confetti error:`, error);
       Alert.alert('Error', `Failed to ${action} confetti: ${error}`);
     }
   };
@@ -737,30 +784,43 @@ function ConfettiTestApp() {
     baseProps: any, 
     typeSpecificProps: any, 
     componentKey: string, 
-    typeName: string
+    typeName: string,
+    textureAssets: any[]
   ) => {
-    const svgCount = svgLayers.length;
-    const perSvgCount = Math.max(1, Math.ceil(customConfig.count / svgCount));
+    const assetCount = textureAssets.length;
+    const perAssetCount = Math.max(1, Math.ceil(customConfig.count / assetCount));
     
-    return svgLayers.map((svg, index) => {
-      console.log({svg});
+    console.log(`🏗️ Rendering ${assetCount} ${useTextures} layers, ${perAssetCount} particles each`);
+    
+    return textureAssets.map((asset, index) => {
+      console.log(`🎨 Layer ${index}: ${useTextures} asset:`, asset);
+      
       const props = {
         ...baseProps,
-        count: perSvgCount,
+        count: perAssetCount,
         ...typeSpecificProps,
-        // Apply SVG texture with proper typing - ensures natural texture appearance
-        ...(svg ? { 
-          type: 'svg' as const, 
-          flakeSvg: svg,
-          // Ensure radius range is set for proper texture scaling
-          radiusRange: baseProps.radiusRange[0] > 0 ? baseProps.radiusRange : [0, 0]
-        } : {}),
       };
+      
+      // Apply texture based on type
+      if (useTextures === 'svg' && asset) {
+        props.type = 'svg' as const;
+        props.flakeSvg = asset;
+      } else if (useTextures === 'png' && asset) {
+        props.type = 'image' as const;
+        props.flakeImage = asset;
+      }
+      
+      console.log(`🔧 Component props:`, {
+        ...props,
+        flakeSvg: props.flakeSvg ? 'SVG_LOADED' : undefined,
+        flakeImage: props.flakeImage ? 'PNG_LOADED' : undefined,
+      });
       
       return (
         <Component
           key={`${componentKey}-${typeName}-${index}`}
           ref={(ref: any) => {
+            console.log(`📌 Setting ref ${index}:`, ref ? 'SET' : 'NULL');
             confettiRefs.current[index] = ref;
           }}
           {...props}
@@ -773,9 +833,23 @@ function ConfettiTestApp() {
     // Create a stable key for remounting
     const componentKey = `custom-${customConfig.type}-${configKey}`;
     
-    const shouldUseSvg = svgLayers.length > 0;
-    if (!shouldUseSvg) {
-      return null;
+    // Determine which textures to use
+    let textureAssets: any[] = [];
+    if (useTextures === 'svg' && loadedSvgs && loadedSvgs.length > 0) {
+      textureAssets = loadedSvgs;
+      console.log(`🎨 Using ${loadedSvgs.length} SVG textures`);
+    } else if (useTextures === 'png' && loadedPngs && loadedPngs.length > 0) {
+      textureAssets = Array.from(loadedPngs);
+      console.log(`🎨 Using ${loadedPngs.length} PNG textures`);
+    } else {
+      console.log(`⚠️ No textures available - SVGs: ${loadedSvgs?.length || 0}, PNGs: ${loadedPngs?.length || 0}`);
+      return (
+        <View style={{ position: 'absolute', top: 100, left: 20, backgroundColor: 'rgba(255,0,0,0.8)', padding: 10, borderRadius: 5 }}>
+          <Text style={{ color: 'white', fontSize: 12 }}>⚠️ Loading textures...</Text>
+          <Text style={{ color: 'white', fontSize: 10 }}>SVGs: {loadedSvgs?.length || 0}/6</Text>
+          <Text style={{ color: 'white', fontSize: 10 }}>PNGs: {loadedPngs?.length || 0}/6</Text>
+        </View>
+      );
     }
     
     const baseProps = {
@@ -795,30 +869,30 @@ function ConfettiTestApp() {
       onAnimationEnd: () => handleAnimationEnd('custom'),
     };
 
+    console.log(`🚀 Rendering ${customConfig.type} confetti with ${textureAssets.length} textures`);
+
     if (customConfig.type === 'basic') {
       const typeProps = {
         blastDuration: (customConfig as BasicConfettiConfig).blastDuration || 300,
         verticalSpacing: (customConfig as BasicConfettiConfig).verticalSpacing || 30,
         cannonsPositions: (customConfig as BasicConfettiConfig).cannonsPositions,
       };
-      return <>{renderConfettiLayers(Confetti, baseProps, typeProps, componentKey, 'basic')}</>;
+      return <>{renderConfettiLayers(Confetti, baseProps, typeProps, componentKey, 'basic', textureAssets)}</>;
     } else if (customConfig.type === 'pi') {
       const typeProps = {
         blastDuration: (customConfig as PIConfettiConfig).blastDuration || 300,
         blastPosition: (customConfig as PIConfettiConfig).blastPosition || { x: SCREEN_WIDTH / 2, y: 150 },
         blastRadius: (customConfig as PIConfettiConfig).blastRadius || 180,
       };
-      return <>{renderConfettiLayers(PIConfetti, baseProps, typeProps, componentKey, 'pi')}</>;
+      return <>{renderConfettiLayers(PIConfetti, baseProps, typeProps, componentKey, 'pi', textureAssets)}</>;
     } else if (customConfig.type === 'continuous') {
       const typeProps = {
         verticalSpacing: (customConfig as ContinuousConfettiConfig).verticalSpacing || 200,
       };
-      return <>{renderConfettiLayers(ContinuousConfetti, baseProps, typeProps, componentKey, 'continuous')}</>;
+      return <>{renderConfettiLayers(ContinuousConfetti, baseProps, typeProps, componentKey, 'continuous', textureAssets)}</>;
     }
     return null;
   };
-
-  const svgLayers = loadedSvgs ?? [];
 
   return (
     <View style={styles.container}>
@@ -832,6 +906,18 @@ function ConfettiTestApp() {
         <View style={styles.header}>
           <Text style={styles.headerTitle}>🎊 Confetti Builder</Text>
           <View style={styles.headerControls}>
+            <TouchableOpacity
+              style={[
+                styles.controlButton,
+                { backgroundColor: useTextures === 'svg' ? '#FF9800' : '#666' },
+              ]}
+              onPress={() => {
+                setUseTextures(useTextures === 'svg' ? 'png' : 'svg');
+                console.log(`🔄 Switched to ${useTextures === 'svg' ? 'PNG' : 'SVG'} textures`);
+              }}
+            >
+              <Text style={styles.controlButtonText}>{useTextures === 'svg' ? 'SVG' : 'PNG'}</Text>
+            </TouchableOpacity>
             <TouchableOpacity
               style={[
                 styles.controlButton, 
@@ -868,6 +954,9 @@ function ConfettiTestApp() {
         </View>
         
         <View style={styles.statusBar}>
+          <Text style={styles.statusText}>
+            Status: {isRunning ? '🎊 Running' : '⏸️ Stopped'} | Textures: {useTextures.toUpperCase()}
+          </Text>
           <Text style={styles.configText}>
             {customConfig.type} | {customConfig.count} particles | {customConfig.fallDuration}ms
           </Text>
