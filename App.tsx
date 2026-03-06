@@ -20,6 +20,7 @@ import {
   Dimensions,
   Clipboard,
   Image,
+  Animated,
 } from 'react-native';
 import {
   SafeAreaProvider,
@@ -262,6 +263,73 @@ const ControlButton = ({
         {title}
       </Text>
     </TouchableOpacity>
+  );
+};
+
+// Accordion Component for collapsible sections
+const AccordionSection = ({
+  title,
+  children,
+  initiallyExpanded = false,
+  icon = '📊',
+}: {
+  title: string;
+  children: React.ReactNode;
+  initiallyExpanded?: boolean;
+  icon?: string;
+}) => {
+  const [isExpanded, setIsExpanded] = useState(initiallyExpanded);
+  const animatedHeight = useRef(new Animated.Value(initiallyExpanded ? 1 : 0)).current;
+
+  const toggleExpanded = () => {
+    const toValue = isExpanded ? 0 : 1;
+    Animated.timing(animatedHeight, {
+      toValue,
+      duration: 300,
+      useNativeDriver: false,
+    }).start();
+    setIsExpanded(!isExpanded);
+  };
+
+  const maxHeight = animatedHeight.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 200], // Adjust max height as needed
+  });
+
+  const rotate = animatedHeight.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '180deg'],
+  });
+
+  return (
+    <View style={styles.accordionContainer}>
+      <TouchableOpacity
+        style={styles.accordionHeader}
+        onPress={toggleExpanded}
+        activeOpacity={0.7}
+      >
+        <View style={styles.accordionHeaderContent}>
+          <Text style={styles.accordionIcon}>{icon}</Text>
+          <Text style={styles.accordionTitle}>{title}</Text>
+          <Animated.Text style={[styles.accordionArrow, { transform: [{ rotate }] }]}>
+            ▼
+          </Animated.Text>
+        </View>
+      </TouchableOpacity>
+      <Animated.View
+        style={[
+          styles.accordionContent,
+          {
+            maxHeight,
+            opacity: animatedHeight,
+          },
+        ]}
+      >
+        <View style={styles.accordionInnerContent}>
+          {children}
+        </View>
+      </Animated.View>
+    </View>
   );
 };
 
@@ -708,9 +776,7 @@ const TexturePreviewBar = ({
   const textureNames = ['Petals', 'Squiggles', 'Stars', 'GreenDonuts', 'Rectangles', 'Squares'];
   
   return (
-    <View style={styles.texturePreviewBar}>
-      <Text style={styles.textureBarTitle}>🎨 Loaded Textures ({useTextures.toUpperCase()})</Text>
-      
+    <View style={styles.texturePreviewBar}>      
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.textureScrollView}>
         <View style={styles.textureRow}>
           {textureNames.map((name, index) => {
@@ -719,27 +785,29 @@ const TexturePreviewBar = ({
             const isActive = (useTextures === 'svg' && hasSvg) || (useTextures === 'png' && hasPng);
             
             return (
-                <><View style={styles.textureImageContainer}>
-                {useTextures === 'png' && hasPng ? (
-                  <Image
-                    source={pngAssets[index]}
-                    style={styles.textureImage}
-                    resizeMode="contain"/>
-                ) : (
-                  <View style={[
-                    styles.texturePlaceholder
-                  ]}>
-                    <Text style={styles.texturePlaceholderText}>
-                      {hasSvg ? 'SVG' : hasPng ? 'PNG' : '❌'}
-                    </Text>
-                  </View>
-                )}
-                
-              </View><Text style={[
-                styles.textureName,
-                isActive && styles.textureNameActive
-              ]}>
-                </Text></>
+              <View key={`texture-${index}-${name}`} style={styles.textureItemContainer}>
+                <View style={styles.textureImageContainer}>
+                  {useTextures === 'png' && hasPng ? (
+                    <Image
+                      source={pngAssets[index]}
+                      style={styles.textureImage}
+                      resizeMode="contain"
+                    />
+                  ) : (
+                    <View style={styles.texturePlaceholder}>
+                      <Text style={styles.texturePlaceholderText}>
+                        {hasSvg ? 'SVG' : hasPng ? 'PNG' : '❌'}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+                <Text style={[
+                  styles.textureName,
+                  isActive && styles.textureNameActive
+                ]}>
+                  {name}
+                </Text>
+              </View>
             );
           })}
         </View>
@@ -782,14 +850,24 @@ function ConfettiTestApp() {
 
   // Force re-render when textures become available for the first time
   useEffect(() => {
-    const texturesAvailable = (useTextures === 'svg' && loadedSvgs) || 
-                             (useTextures === 'png' && loadedPngs);
+    const texturesAvailable = (useTextures === 'svg' && loadedSvgs && loadedSvgs.length === svgAssets.length) || 
+                             (useTextures === 'png' && loadedPngs && loadedPngs.length === pngAssets.length);
     
     if (texturesAvailable) {
-      console.log('🔄 Textures loaded, forcing confetti re-render with textures');
+      console.log('🔄 All textures loaded, forcing confetti re-render with textures');
       setConfigKey(prev => prev + 1);
     }
   }, [loadedSvgs, loadedPngs, useTextures]);
+
+  // Prevent rendering when textures are partially loaded to avoid array mismatch errors
+  const areTexturesReady = useMemo(() => {
+    if (useTextures === 'svg') {
+      return loadedSvgs && loadedSvgs.length === svgAssets.length;
+    } else if (useTextures === 'png') {
+      return loadedPngs && loadedPngs.length === pngAssets.length;
+    }
+    return true; // No textures needed
+  }, [useTextures, loadedSvgs, loadedPngs]);
 
   const handleAnimationStart = useCallback((type: string) => {
     console.log(`🎊 ${type} confetti animation started`);
@@ -878,6 +956,141 @@ function ConfettiTestApp() {
     }
   }, [customConfig]);
 
+  // Paste config from clipboard
+  const pasteConfigFromClipboard = useCallback(async () => {
+    try {
+      const rawClipboardContent = await Clipboard.getString();
+      
+      if (!rawClipboardContent || !rawClipboardContent.trim()) {
+        Alert.alert('Error', 'Clipboard is empty');
+        return;
+      }
+
+      // Clean up the clipboard content (remove potential hidden characters, normalize whitespace)
+      const clipboardContent = rawClipboardContent
+        .replace(/[\u00A0\u1680\u2000-\u200A\u202F\u205F\u3000]/g, ' ') // Replace various unicode spaces with regular spaces
+        .replace(/[\u200B-\u200D\uFEFF]/g, '') // Remove zero-width characters
+        .trim();
+
+      console.log('📋 Clipboard content length:', clipboardContent.length);
+      console.log('📋 First 100 chars:', clipboardContent.substring(0, 100));
+
+      // Parse JSON
+      let parsedConfig: any;
+      try {
+        parsedConfig = JSON.parse(clipboardContent);
+      } catch (parseError) {
+        console.error('❌ JSON Parse Error:', parseError);
+        Alert.alert(
+          'JSON Parse Error', 
+          `Invalid JSON format in clipboard.\n\nError: ${parseError instanceof Error ? parseError.message : String(parseError)}\n\nFirst 200 characters:\n${clipboardContent.substring(0, 200)}...`
+        );
+        return;
+      }
+
+      console.log('✅ JSON parsed successfully:', Object.keys(parsedConfig));
+
+      // Validate config structure
+      const requiredFields = [
+        'type', 'flakeSize', 'count', 'fallDuration',
+        'autoStartDelay', 'sizeVariation', 'randomSpeed',
+        'randomOffset', 'fadeOutOnEnd', 'radiusRange'
+      ];
+      
+      const missingFields = requiredFields.filter(field => 
+        parsedConfig[field] === undefined || parsedConfig[field] === null
+      );
+      
+      if (missingFields.length > 0) {
+        console.error('❌ Missing fields:', missingFields);
+        Alert.alert('Validation Error', `Missing required fields: ${missingFields.join(', ')}\n\nFound fields: ${Object.keys(parsedConfig).join(', ')}`);
+        return;
+      }
+
+      // Validate confetti type
+      if (!['basic', 'pi', 'continuous'].includes(parsedConfig.type)) {
+        Alert.alert('Validation Error', `Invalid confetti type: "${parsedConfig.type}". Must be: basic, pi, or continuous`);
+        return;
+      }
+
+      console.log('🎯 Config type validated:', parsedConfig.type);
+
+      // Type-specific validation
+      if (parsedConfig.type === 'basic') {
+        const requiredBasicFields = ['blastDuration', 'cannonsPositions', 'verticalSpacing', 'autoplay', 'isInfinite'];
+        const missingBasicFields = requiredBasicFields.filter(field => 
+          parsedConfig[field] === undefined || parsedConfig[field] === null
+        );
+        if (missingBasicFields.length > 0) {
+          console.error('❌ Missing basic fields:', missingBasicFields);
+          Alert.alert('Basic Confetti Validation Error', `Missing basic confetti fields: ${missingBasicFields.join(', ')}\n\nFound fields: ${Object.keys(parsedConfig).join(', ')}`);
+          return;
+        }
+        
+        // Validate cannonsPositions array structure
+        if (!Array.isArray(parsedConfig.cannonsPositions)) {
+          Alert.alert('Validation Error', 'cannonsPositions must be an array');
+          return;
+        }
+        
+      } else if (parsedConfig.type === 'pi') {
+        const requiredPiFields = ['blastDuration', 'blastPosition', 'blastRadius'];
+        const missingPiFields = requiredPiFields.filter(field => 
+          parsedConfig[field] === undefined || parsedConfig[field] === null
+        );
+        if (missingPiFields.length > 0) {
+          console.error('❌ Missing PI fields:', missingPiFields);
+          Alert.alert('PI Confetti Validation Error', `Missing PI confetti fields: ${missingPiFields.join(', ')}\n\nFound fields: ${Object.keys(parsedConfig).join(', ')}`);
+          return;
+        }
+      } else if (parsedConfig.type === 'continuous') {
+        if (parsedConfig.verticalSpacing === undefined || parsedConfig.verticalSpacing === null) {
+          Alert.alert('Continuous Confetti Validation Error', 'Missing continuous confetti field: verticalSpacing');
+          return;
+        }
+      }
+
+      // Set default dimensions if not provided
+      const newConfig = {
+        ...parsedConfig,
+        width: parsedConfig.width || SCREEN_WIDTH,
+        height: parsedConfig.height || SCREEN_HEIGHT,
+        // Remove functions that can't be serialized
+        onAnimationStart: undefined,
+        onAnimationEnd: undefined,
+      };
+
+      // Ask user for confirmation before applying
+      Alert.alert(
+        'Apply Configuration?',
+        `Apply pasted ${newConfig.type} confetti configuration with ${newConfig.count} particles?`,
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel'
+          },
+          {
+            text: 'Apply',
+            onPress: () => {
+              // Stop current animation before applying new config
+              if (isRunning) {
+                handleConfettiAction('reset');
+              }
+              
+              // Apply the new configuration
+              updateCustomConfig(newConfig as CustomConfettiConfig);
+              
+              Alert.alert('Success', 'Configuration applied successfully!');
+            }
+          }
+        ]
+      );
+      
+    } catch (error) {
+      Alert.alert('Error', `Failed to paste configuration: ${error}`);
+    }
+  }, [isRunning, handleConfettiAction, updateCustomConfig]);
+
   // Helper function to render a single confetti instance with texture support
   const renderSingleConfettiLayer = (
     Component: any, 
@@ -930,6 +1143,12 @@ function ConfettiTestApp() {
   };
 
   const renderCustomConfetti = () => {
+    // Don't render if textures are not ready to prevent array mismatch
+    if (!areTexturesReady) {
+      console.log('⏳ Waiting for textures to load completely before rendering confetti');
+      return null;
+    }
+
     // Create a stable key for remounting
     const componentKey = `custom-${customConfig.type}-${configKey}`;
     
@@ -937,11 +1156,11 @@ function ConfettiTestApp() {
     let availableTextures: any[] = [];
     let hasValidTextures = false;
     
-    if (useTextures === 'svg' && loadedSvgs && loadedSvgs.length > 0) {
+    if (useTextures === 'svg' && loadedSvgs && loadedSvgs.length === svgAssets.length) {
       availableTextures = loadedSvgs; // Use all SVG textures
       hasValidTextures = true;
       console.log(`🎨 Using all ${availableTextures.length} SVG textures:`, availableTextures.map((_, idx) => `texture-${idx}`));
-    } else if (useTextures === 'png' && loadedPngs && loadedPngs.length > 0) {
+    } else if (useTextures === 'png' && loadedPngs && loadedPngs.length === pngAssets.length) {
       availableTextures = loadedPngs; // Use all PNG textures
       hasValidTextures = true;
       console.log(`🎨 Using all ${availableTextures.length} PNG textures:`, availableTextures.map((_, idx) => `texture-${idx}`));
@@ -1059,18 +1278,6 @@ function ConfettiTestApp() {
           <View style={styles.headerControls}>
             <TouchableOpacity
               style={[
-                styles.controlButton,
-                { backgroundColor: useTextures === 'svg' ? '#FF9800' : '#666' },
-              ]}
-              onPress={() => {
-                setUseTextures(useTextures === 'svg' ? 'png' : 'svg');
-                console.log(`🔄 Switched to ${useTextures === 'svg' ? 'PNG' : 'SVG'} textures`);
-              }}
-            >
-              <Text style={styles.controlButtonText}>{useTextures === 'svg' ? 'SVG' : 'PNG'}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
                 styles.controlButton, 
                 styles.playButton,
               ]}
@@ -1101,27 +1308,50 @@ function ConfettiTestApp() {
             >
               <Text style={styles.controlButtonText}>📋</Text>
             </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.controlButton, styles.pasteButton]}
+              onPress={pasteConfigFromClipboard}
+            >
+              <Text style={styles.controlButtonText}>📥</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.controlButton,
+                { backgroundColor: useTextures === 'svg' ? '#FF9800' : '#666' },
+              ]}
+              onPress={() => {
+                setUseTextures(useTextures === 'svg' ? 'png' : 'svg');
+                console.log(`🔄 Switched to ${useTextures === 'svg' ? 'PNG' : 'SVG'} textures`);
+              }}
+            >
+              <Text style={styles.controlButtonText}>{useTextures === 'svg' ? 'SVG' : 'PNG'}</Text>
+            </TouchableOpacity>
           </View>
         </View>
         
-        <View style={styles.statusBar}>
-          <Text style={styles.statusText}>
-            Status: {isRunning ? '🎊 Running' : '⏸️ Stopped'} | Textures: {useTextures.toUpperCase()}
-          </Text>
-          <Text style={styles.configText}>
-            {customConfig.type} | {customConfig.count} particles | {customConfig.fallDuration}ms
-          </Text>
-        </View>
-        
-        <TexturePreviewBar
-          loadedSvgs={loadedSvgs}
-          loadedPngs={loadedPngs}
-          useTextures={useTextures}
-          onTextureTypeChange={(type) => {
-            setUseTextures(type);
-            console.log(`🔄 Switched to ${type.toUpperCase()} textures from preview bar`);
-          }}
-        />
+        <AccordionSection
+          title="Status & Info"
+          icon="📊"
+          initiallyExpanded={false}
+        >
+          <View style={styles.accordionStatusContent}>
+            <Text style={styles.statusText}>
+              Status: {isRunning ? '🎊 Running' : '⏸️ Stopped'} | Textures: {useTextures.toUpperCase()}
+            </Text>
+            <Text style={styles.configText}>
+              {customConfig.type} | {customConfig.count} particles | {customConfig.fallDuration}ms
+            </Text>
+             <TexturePreviewBar
+            loadedSvgs={loadedSvgs}
+            loadedPngs={loadedPngs}
+            useTextures={useTextures}
+            onTextureTypeChange={(type) => {
+              setUseTextures(type);
+              console.log(`🔄 Switched to ${type.toUpperCase()} textures from preview bar`);
+            }}
+          />
+          </View>
+        </AccordionSection>
         
         <ParameterEditor
           config={customConfig}
@@ -1157,8 +1387,10 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 8,
     padding: 16,
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
     borderBottomWidth: 1,
@@ -1172,12 +1404,14 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 20,
+    flexBasis: '100%',
     fontWeight: 'bold',
     color: '#333',
     flex: 1,
   },
   headerControls: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
   },
   controlButton: {
@@ -1200,18 +1434,59 @@ const styles = StyleSheet.create({
   copyButton: {
     backgroundColor: '#2196F3',
   },
+  pasteButton: {
+    backgroundColor: '#9C27B0',
+  },
   controlButtonText: {
     color: 'white',
     fontWeight: '600',
     fontSize: 12,
   },
-  statusBar: {
-    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+  // Accordion styles
+  accordionContainer: {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+    overflow: 'hidden',
+    zIndex: 2,
+  },
+  accordionHeader: {
+    backgroundColor: 'rgba(248, 249, 250, 0.95)',
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-    zIndex: 2,
+    borderBottomColor: '#e9ecef',
+  },
+  accordionHeaderContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  accordionIcon: {
+    fontSize: 16,
+    marginRight: 8,
+  },
+  accordionTitle: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#495057',
+  },
+  accordionArrow: {
+    fontSize: 12,
+    color: '#6c757d',
+    marginLeft: 8,
+  },
+  accordionContent: {
+    overflow: 'hidden',
+  },
+  accordionInnerContent: {
+    paddingBottom: 8,
+  },
+  accordionStatusContent: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: 'rgba(76, 175, 80, 0.05)',
   },
   statusText: {
     fontSize: 14,
@@ -1226,11 +1501,7 @@ const styles = StyleSheet.create({
   
   // Texture Preview Bar styles
   texturePreviewBar: {
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-    paddingVertical: 12,
-    zIndex: 2,
+    paddingVertical: 8,
   },
   textureBarTitle: {
     fontSize: 16,
@@ -1259,6 +1530,11 @@ const styles = StyleSheet.create({
   textureItemActive: {
     backgroundColor: '#e8f5e8',
     borderColor: '#4CAF50',
+  },
+  textureItemContainer: {
+    alignItems: 'center',
+    marginHorizontal: 8,
+    marginVertical: 4,
   },
   textureImageContainer: {
     position: 'relative',
