@@ -31,3 +31,30 @@ React Native project to test react-native-fast-confetti library functionality in
 - PIConfetti (burst effect)
 - ContinuousConfetti (continuous falling effect)
 - Custom textures and configurations
+
+## Essential Requirement: Custom SVG and PNG Confetti Textures
+**MANDATORY**: All confetti implementations MUST include custom SVG and PNG texture support using the existing assets in the `images/` directory.
+
+### Implementation Requirements:
+1. **Import required hooks**: Use `useImage` and `useSVG` from `@shopify/react-native-skia`
+2. **SVG Implementation**: 
+   - Set `type="svg"` prop
+   - Use `flakeSvg` prop with `useSVG(require('path/to/svg'))`
+   - Load SVGs from `images/svg/` directory
+3. **PNG Implementation**:
+   - Set `type="image"` prop  
+   - Use `flakeImage` prop with `useImage(require('path/to/png'))`
+   - Load PNGs from `images/png/` directory
+4. **All confetti types must support custom textures**: Confetti, PIConfetti, and ContinuousConfetti
+
+### Example Usage (from official docs):
+```javascript
+import { Confetti } from 'react-native-fast-confetti';
+import { useImage, useSVG } from '@shopify/react-native-skia';
+
+const customSVG = useSVG(require('../images/svg/example.svg'));
+const customImage = useImage(require('../images/png/example.png'));
+
+<Confetti type="svg" flakeSvg={customSVG} />
+<Confetti type="image" flakeImage={customImage} />
+```
