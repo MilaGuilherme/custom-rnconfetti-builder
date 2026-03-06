@@ -94,6 +94,7 @@ interface PIConfettiConfig extends BaseConfettiConfig {
   blastDuration: number;
   blastPosition: { x: number; y: number };
   blastRadius: number;
+  blastPositionOffset: number;
 }
 
 interface ContinuousConfettiConfig extends BaseConfettiConfig {
@@ -138,6 +139,7 @@ const presetConfigs = {
     blastDuration: 300,
     blastPosition: { x: SCREEN_WIDTH / 2, y: 150 },
     blastRadius: 180,
+    blastPositionOffset: 10,
     autoStartDelay: 0,
     sizeVariation: 0.4, // More variation for dynamic texture sizes
     randomSpeed: { min: 0.8, max: 1.2 },
@@ -671,6 +673,16 @@ const ParameterEditor = ({
             })}
             maxY={SCREEN_HEIGHT / 2}
           />
+          
+          <SliderControl
+            label="Position Offset"
+            value={(config as PIConfettiConfig).blastPositionOffset || 10}
+            onValueChange={(blastPositionOffset) => updateConfig({ blastPositionOffset })}
+            minimumValue={0}
+            maximumValue={50}
+            step={2}
+            suffix="px"
+          />
         </View>
       )}
 
@@ -1034,7 +1046,7 @@ function ConfettiTestApp() {
         }
         
       } else if (parsedConfig.type === 'pi') {
-        const requiredPiFields = ['blastDuration', 'blastPosition', 'blastRadius'];
+        const requiredPiFields = ['blastDuration', 'blastPosition', 'blastRadius', 'blastPositionOffset'];
         const missingPiFields = requiredPiFields.filter(field => 
           parsedConfig[field] === undefined || parsedConfig[field] === null
         );
@@ -1229,12 +1241,13 @@ function ConfettiTestApp() {
             );
           } else if (customConfig.type === 'pi') {
             const basePosition = (customConfig as PIConfettiConfig).blastPosition || { x: SCREEN_WIDTH / 2, y: 150 };
+            const offsetRange = ((customConfig as PIConfettiConfig).blastPositionOffset || 10) * 2;
             
             const typeProps = {
               blastDuration: (customConfig as PIConfettiConfig).blastDuration || 300,
               blastPosition: { 
-                x: basePosition.x + ((Math.random() - 0.5) * 20), 
-                y: basePosition.y + ((Math.random() - 0.5) * 20) 
+              x: basePosition.x + ((Math.random() - 0.5) * offsetRange), 
+              y: basePosition.y + ((Math.random() - 0.5) * offsetRange) 
               },
               blastRadius: (customConfig as PIConfettiConfig).blastRadius || 180,
             };
