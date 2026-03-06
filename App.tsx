@@ -1228,9 +1228,14 @@ function ConfettiTestApp() {
               index // Pass layer index for ref management
             );
           } else if (customConfig.type === 'pi') {
+            const basePosition = (customConfig as PIConfettiConfig).blastPosition || { x: SCREEN_WIDTH / 2, y: 150 };
+            
             const typeProps = {
               blastDuration: (customConfig as PIConfettiConfig).blastDuration || 300,
-              blastPosition: (customConfig as PIConfettiConfig).blastPosition || { x: SCREEN_WIDTH / 2, y: 150 },
+              blastPosition: { 
+                x: basePosition.x + ((Math.random() - 0.5) * 20), 
+                y: basePosition.y + ((Math.random() - 0.5) * 20) 
+              },
               blastRadius: (customConfig as PIConfettiConfig).blastRadius || 180,
             };
             return renderSingleConfettiLayer(
